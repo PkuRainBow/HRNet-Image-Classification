@@ -10,6 +10,7 @@ from __future__ import print_function
 
 import torch
 
+logger = logging.getLogger("HRNet-CLS")
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
