@@ -141,7 +141,9 @@ def main():
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
     '''
     # Change DP to DDP
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank])
+    torch.cuda.set_device(args.local_rank)
+    model = model.to(args.local_rank)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank)
 
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
