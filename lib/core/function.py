@@ -16,7 +16,7 @@ import torch
 from core.evaluate import accuracy
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("HRNet-CLS")
 
 
 def train(config, train_loader, model, criterion, optimizer, epoch,
