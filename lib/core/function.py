@@ -51,9 +51,6 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         # measure accuracy and record loss
         losses.update(loss.item(), input.size(0))
 
-        print(output.shape)
-        print(target.shape)
-
         prec1, prec5 = accuracy(output, target, (1, 5))
 
         top1.update(prec1[0], input.size(0))
