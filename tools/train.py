@@ -98,13 +98,14 @@ def parse_args():
 def main():
     args = parse_args()
 
-    logger, final_output_dir, tb_log_dir = create_logger(
-        config, args.cfg, 'train')
-
     if args.dist_url == "env://" and args.world_size == -1:
         args.world_size = int(os.environ["WORLD_SIZE"])
     
     dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url)
+    
+    logger, final_output_dir, tb_log_dir = create_logger(
+        config, args.cfg, 'train')
+
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
