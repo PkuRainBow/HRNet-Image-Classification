@@ -36,6 +36,7 @@ from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
 from utils.utils import create_logger
+from lib.datasets.TSV import TSVInstance
 
 
 def parse_args():
@@ -71,8 +72,11 @@ def parse_args():
                         default=-1,
                         type=int,
                         help='node rank for distributed training')
+    parser.add_argument("--local_rank",
+                        type=int,
+                        default=0)
     parser.add_argument('--dist-url',
-                        default='tcp://224.66.41.62:23456',
+                        default='env://',
                         type=str,
                         help='url used to set up distributed training')
     parser.add_argument('--dist-backend',
@@ -96,6 +100,11 @@ def main():
 
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
+
+    if args.dist_url == "env://" and args.world_size == -1:
+        args.world_size = int(os.environ["WORLD_SIZE"])
+    
+    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url)
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
@@ -127,7 +136,12 @@ def main():
     }
 
     gpus = list(config.GPUS)
+
+    '''
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
+    '''
+    # Change DP to DDP
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank])
 
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
@@ -168,6 +182,7 @@ def main():
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
+    '''
     train_dataset = datasets.ImageFolder(
         traindir,
         transforms.Compose([
@@ -177,22 +192,38 @@ def main():
             normalize,
         ])
     )
+    '''
+    # Change to TSV dataset instance
+    train_dataset = TSVInstance(
+        traindir,
+        transforms.Compose([
+            transforms.RandomResizedCrop(config.MODEL.IMAGE_SIZE[0]),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            normalize,
+        ])
+    )
+    
+    # DDP requires DistributedSampler
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU*len(gpus),
-        shuffle=True,
+        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU,
+        shuffle=(train_sampler is None),
         num_workers=config.WORKERS,
-        pin_memory=True
+        pin_memory=True,
+        sampler=train_sampler
     )
 
     valid_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
+        TSVInstance(valdir, transforms.Compose([
             transforms.Resize(int(config.MODEL.IMAGE_SIZE[0] / 0.875)),
             transforms.CenterCrop(config.MODEL.IMAGE_SIZE[0]),
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=config.TEST.BATCH_SIZE_PER_GPU*len(gpus),
+        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True
