@@ -65,7 +65,8 @@ CUDNN:
   ENABLED: true
 DATASET:
   DATASET: 'imagenet'
-  ROOT: '/mnt/imagenet100_zhirong'
+  DATA_FORMAT: 'jpg'
+  ROOT: '/dev/shm/imagenet_zhirong/'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
@@ -82,7 +83,7 @@ TRAIN:
   - 60
   - 90
   OPTIMIZER: sgd
-  LR: 0.05
+  LR: 0.1
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
