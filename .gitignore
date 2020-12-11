@@ -1,0 +1,6 @@
+log/
+output/
+*.ipynb
+*.pyc
+*.pth
+

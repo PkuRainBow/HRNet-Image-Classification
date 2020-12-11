@@ -32,11 +32,13 @@ from config import config
 from config import update_config
 from core.function import train
 from core.function import validate
+from core.scheduler.cosine_lr import CosineLRScheduler
 from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
 from utils.utils import create_logger
 from datasets.TSV import TSVInstance
+
 
 
 def parse_args():
@@ -166,17 +168,38 @@ def main():
             logger.info("=> loaded checkpoint (epoch {})"
                         .format(checkpoint['epoch']))
             best_model = True
-            
-    if isinstance(config.TRAIN.LR_STEP, list):
-        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR,
-            last_epoch-1
-        )
-    else:
+        
+    if config.TRAIN.SCHEDULER == 'cosine':
+        # lr_scheduler = CosineLRScheduler(
+        #     optimizer,
+        #     t_initial=last_epoch-1,
+        #     t_mul=1.,
+        #     lr_min=config.TRAIN.LR,
+        #     decay_rate=args.decay_rate,
+        #     warmup_lr_init=args.warmup_lr,
+        #     warmup_t=args.warmup_epochs,
+        #     cycle_limit=1,
+        #     t_in_epochs=True,
+        #     noise_range_t=None,
+        #     noise_pct=0.67,
+        #     noise_std=1.,
+        #     noise_seed=42,
+        # )
         lr_scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR,
             last_epoch-1
         )
+    else:
+        if isinstance(config.TRAIN.LR_STEP, list):
+            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR,
+                last_epoch-1
+            )
+        else:
+            lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR,
+                last_epoch-1
+            )
 
     # Data loading code
     traindir = os.path.join(config.DATASET.ROOT, config.DATASET.TRAIN_SET)
