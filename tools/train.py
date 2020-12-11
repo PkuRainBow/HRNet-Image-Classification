@@ -32,7 +32,8 @@ from config import config
 from config import update_config
 from core.function import train
 from core.function import validate
-from core.scheduler.cosine_lr import CosineLRScheduler
+# from core.scheduler.cosine_lr import CosineLRScheduler
+from core.lr_scheduler import WarmupCosineLR
 from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
@@ -170,24 +171,13 @@ def main():
             best_model = True
         
     if config.TRAIN.SCHEDULER == 'cosine':
-        # lr_scheduler = CosineLRScheduler(
-        #     optimizer,
-        #     t_initial=last_epoch-1,
-        #     t_mul=1.,
-        #     lr_min=config.TRAIN.LR,
-        #     decay_rate=args.decay_rate,
-        #     warmup_lr_init=args.warmup_lr,
-        #     warmup_t=args.warmup_epochs,
-        #     cycle_limit=1,
-        #     t_in_epochs=True,
-        #     noise_range_t=None,
-        #     noise_pct=0.67,
-        #     noise_std=1.,
-        #     noise_seed=42,
-        # )
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, config.TRAIN.LR_STEP, config.TRAIN.LR_FACTOR,
-            last_epoch-1
+        lr_scheduler = WarmupCosineLR(
+            optimizer,
+            config.TRAIN.END_EPOCH,
+            warmup_factor=0.001,
+            warmup_iters=5,
+            warmup_method="linear",
+            last_epoch=last_epoch-1
         )
     else:
         if isinstance(config.TRAIN.LR_STEP, list):

@@ -51,10 +51,6 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     model.train()
     scaler = torch.cuda.amp.GradScaler()
 
-    # cutmix hyper-parameters
-    beta = 1.0
-    cutmix_prob = 1.0
-
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
         optimizer.zero_grad()
@@ -64,11 +60,11 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         #target = target - 1 # Specific for imagenet
 
         # compute output
-        r = np.random.rand(1)
         with torch.cuda.amp.autocast():
-            if beta > 0 and r < cutmix_prob:
+            r = np.random.rand(1)
+            if config.TRAIN.CUTMIX and config.TRAIN.CUTMIX_BETA > 0 and r < config.TRAIN.CUTMIX_PROB:
                 # generate mixed sample
-                lam = np.random.beta(beta, beta)
+                lam = np.random.beta(config.TRAIN.CUTMIX_BETA, config.TRAIN.CUTMIX_BETA)
                 rand_index = torch.randperm(input.size()[0]).cuda()
                 target_a = target
                 target_b = target[rand_index]
