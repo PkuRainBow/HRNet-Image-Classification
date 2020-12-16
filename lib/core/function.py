@@ -50,6 +50,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
 
     # switch to train mode
     model.train()
+    scaler = torch.cuda.amp.GradScaler()
 
     if int(os.environ.get("auto_mix_precision", 1)):
         scaler = torch.cuda.amp.GradScaler()

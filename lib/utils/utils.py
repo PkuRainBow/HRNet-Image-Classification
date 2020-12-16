@@ -19,7 +19,6 @@ import torch.optim as optim
 import torch.distributed as dist
 from utils.logger import setup_logger
 
-
 def create_logger(cfg, cfg_name, phase='train'):
     root_output_dir = Path(cfg.OUTPUT_DIR)
     # set up logger
