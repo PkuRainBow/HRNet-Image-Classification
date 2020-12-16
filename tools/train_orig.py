@@ -18,7 +18,6 @@ import sys
 import torch
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
-import torch.distributed as dist
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
@@ -32,7 +31,6 @@ from config import config
 from config import update_config
 from core.function import train
 from core.function import validate
-# from core.scheduler.cosine_lr import CosineLRScheduler
 from core.lr_scheduler import WarmupCosineLR, WarmupMultiStepLR
 from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
@@ -67,32 +65,6 @@ def parse_args():
                         type=str,
                         default='')
 
-    parser.add_argument('--world-size',
-                        default=-1,
-                        type=int,
-                        help='number of nodes for distributed training')
-    parser.add_argument('--rank',
-                        default=-1,
-                        type=int,
-                        help='node rank for distributed training')
-    parser.add_argument("--local_rank",
-                        type=int,
-                        default=0)
-    parser.add_argument('--dist-url',
-                        default='env://',
-                        type=str,
-                        help='url used to set up distributed training')
-    parser.add_argument('--dist-backend',
-                        default='nccl',
-                        type=str,
-                        help='distributed backend')
-    parser.add_argument('--multiprocessing-distributed',
-                        action='store_true',
-                        help='Use multi-processing distributed training to launch '
-                            'N processes per node, which has N GPUs. This is the '
-                            'fastest way to use PyTorch for either single node or '
-                            'multi node data parallel training')
-
     args = parser.parse_args()
     update_config(config, args)
 
@@ -101,14 +73,8 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.dist_url == "env://" and args.world_size == -1:
-        args.world_size = int(os.environ["WORLD_SIZE"])
-    
-    dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url)
-    
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
-
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
@@ -140,14 +106,7 @@ def main():
     }
 
     gpus = list(config.GPUS)
-
-    '''
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
-    '''
-    # Change DP to DDP
-    torch.cuda.set_device(args.local_rank)
-    model = model.to(args.local_rank)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank)
 
     # define loss function (criterion) and optimizer
     criterion = torch.nn.CrossEntropyLoss().cuda()
@@ -169,7 +128,7 @@ def main():
             logger.info("=> loaded checkpoint (epoch {})"
                         .format(checkpoint['epoch']))
             best_model = True
-        
+            
     if config.TRAIN.SCHEDULER == 'cosine':
         lr_scheduler = WarmupCosineLR(
             optimizer,
@@ -181,14 +140,11 @@ def main():
         )
     else:
         if isinstance(config.TRAIN.LR_STEP, list):
-            lr_scheduler = WarmupMultiStepLR(
+            lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer,
                 config.TRAIN.LR_STEP,
                 config.TRAIN.LR_FACTOR,
-                warmup_factor=0.001,
-                warmup_iters=5,
-                warmup_method="linear",
-                last_epoch=last_epoch-1
+                last_epoch-1
             )
         else:
             lr_scheduler = torch.optim.lr_scheduler.StepLR(
@@ -226,17 +182,12 @@ def main():
             normalize,
         ])
     )
-    
-    # DDP requires DistributedSampler
-    train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU,
-        shuffle=(train_sampler is None),
+        batch_size=config.TRAIN.BATCH_SIZE_PER_GPU*len(gpus),
+        shuffle=True,
         num_workers=config.WORKERS,
-        pin_memory=True,
-        sampler=train_sampler
+        pin_memory=True
     )
 
     valid_loader = torch.utils.data.DataLoader(
@@ -246,7 +197,7 @@ def main():
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=config.TEST.BATCH_SIZE_PER_GPU,
+        batch_size=config.TEST.BATCH_SIZE_PER_GPU*len(gpus),
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True

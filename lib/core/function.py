@@ -11,12 +11,33 @@ from __future__ import print_function
 import time
 import logging
 
+import os
 import torch
+import numpy as np
 
 from core.evaluate import accuracy
 
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("HRNet-CLS")
+
+
+def rand_bbox(size, lam):
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = np.int(W * cut_rat)
+    cut_h = np.int(H * cut_rat)
+
+    # uniform
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
 
 
 def train(config, train_loader, model, criterion, optimizer, epoch,
@@ -27,26 +48,58 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     top1 = AverageMeter()
     top5 = AverageMeter()
 
-
     # switch to train mode
     model.train()
 
+    if int(os.environ.get("auto_mix_precision", 1)):
+        scaler = torch.cuda.amp.GradScaler()
+
     end = time.time()
     for i, (input, target) in enumerate(train_loader):
+        optimizer.zero_grad()
+
         # measure data loading time
         data_time.update(time.time() - end)
         #target = target - 1 # Specific for imagenet
 
         # compute output
-        output = model(input)
-        target = target.cuda(non_blocking=True)
+        if int(os.environ.get("auto_mix_precision", 1)):
+            with torch.cuda.amp.autocast():
+                r = np.random.rand(1)
+                if config.TRAIN.CUTMIX and config.TRAIN.CUTMIX_BETA > 0 and r < config.TRAIN.CUTMIX_PROB:
+                    # generate mixed sample
+                    lam = np.random.beta(config.TRAIN.CUTMIX_BETA, config.TRAIN.CUTMIX_BETA)
+                    rand_index = torch.randperm(input.size()[0]).cuda()
+                    target_a = target
+                    target_b = target[rand_index]
+                    bbx1, bby1, bbx2, bby2 = rand_bbox(input.size(), lam)
+                    input[:, :, bbx1:bbx2, bby1:bby2] = input[rand_index, :, bbx1:bbx2, bby1:bby2]
+                    # adjust lambda to exactly match pixel ratio
+                    lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (input.size()[-1] * input.size()[-2]))
+                    # compute output
+                    output = model(input)
+                    target = target.cuda(non_blocking=True)
+                    target_a = target_a.cuda(non_blocking=True)
+                    target_b = target_b.cuda(non_blocking=True)
+                    loss = criterion(output, target_a) * lam + criterion(output, target_b) * (1. - lam)
+                else:
+                    output = model(input)
+                    target = target.cuda(non_blocking=True)
+                    loss = criterion(output, target)
 
-        loss = criterion(output, target)
+            # compute gradient and do update step
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
-        # compute gradient and do update step
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        else:
+            output = model(input)
+            target = target.cuda(non_blocking=True)
+            loss = criterion(output, target)
+
+            # compute gradient and do update step
+            loss.backward()
+            optimizer.step()
 
         # measure accuracy and record loss
         losses.update(loss.item(), input.size(0))

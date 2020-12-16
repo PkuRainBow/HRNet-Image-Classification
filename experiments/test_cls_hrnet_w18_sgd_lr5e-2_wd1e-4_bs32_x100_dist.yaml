@@ -7,7 +7,7 @@ PRINT_FREQ: 100
 
 MODEL: 
   NAME: cls_hrnet
-  IMAGE_SIZE:
+  IMAGE_SIZE: 
     - 224
     - 224
   EXTRA:
@@ -65,7 +65,7 @@ CUDNN:
   ENABLED: true
 DATASET:
   DATASET: 'imagenet'
-  ROOT: '/dev/shm/imagenet_zhirong/'
+  ROOT: '/mnt/imagenet100_zhirong'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
@@ -87,6 +87,5 @@ TRAIN:
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
-  CUTMIX: false
 DEBUG:
   DEBUG: false

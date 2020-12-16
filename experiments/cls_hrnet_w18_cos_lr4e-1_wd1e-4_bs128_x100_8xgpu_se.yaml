@@ -6,15 +6,16 @@ WORKERS: 4
 PRINT_FREQ: 100
 
 MODEL: 
-  NAME: cls_hrnet
-  IMAGE_SIZE:
+  NAME: cls_se_hrnet
+  IMAGE_SIZE: 
     - 224
     - 224
   EXTRA:
+    REDUCTION: 1
     STAGE1:
       NUM_MODULES: 1
       NUM_RANCHES: 1
-      BLOCK: BOTTLENECK
+      BLOCK: SEBOTTLENECK
       NUM_BLOCKS:
       - 4
       NUM_CHANNELS:
@@ -23,7 +24,7 @@ MODEL:
     STAGE2:
       NUM_MODULES: 1
       NUM_BRANCHES: 2
-      BLOCK: BASIC
+      BLOCK: SEBASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -34,7 +35,7 @@ MODEL:
     STAGE3:
       NUM_MODULES: 4
       NUM_BRANCHES: 3
-      BLOCK: BASIC
+      BLOCK: SEBASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -47,7 +48,7 @@ MODEL:
     STAGE4:
       NUM_MODULES: 3
       NUM_BRANCHES: 4
-      BLOCK: BASIC
+      BLOCK: SEBASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -69,10 +70,10 @@ DATASET:
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
-  BATCH_SIZE_PER_GPU: 32
+  BATCH_SIZE_PER_GPU: 128
   MODEL_FILE: ''
 TRAIN:
-  BATCH_SIZE_PER_GPU: 32
+  BATCH_SIZE_PER_GPU: 128
   BEGIN_EPOCH: 0
   END_EPOCH: 100
   RESUME: true
@@ -82,11 +83,11 @@ TRAIN:
   - 60
   - 90
   OPTIMIZER: sgd
-  LR: 0.05
+  SCHEDULER: cosine
+  LR: 0.4
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
-  CUTMIX: false
 DEBUG:
   DEBUG: false

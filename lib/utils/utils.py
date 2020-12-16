@@ -16,6 +16,9 @@ from pathlib import Path
 
 import torch
 import torch.optim as optim
+import torch.distributed as dist
+from utils.logger import setup_logger
+
 
 def create_logger(cfg, cfg_name, phase='train'):
     root_output_dir = Path(cfg.OUTPUT_DIR)
@@ -35,14 +38,18 @@ def create_logger(cfg, cfg_name, phase='train'):
 
     time_str = time.strftime('%Y-%m-%d-%H-%M')
     log_file = '{}_{}_{}.log'.format(cfg_name, time_str, phase)
-    final_log_file = final_output_dir / log_file
-    head = '%(asctime)-15s %(message)s'
-    logging.basicConfig(filename=str(final_log_file),
-                        format=head)
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    console = logging.StreamHandler()
-    logging.getLogger('').addHandler(console)
+    final_log_file = str(final_output_dir / log_file)
+
+    if int(os.environ.get("distribute_training", 1)):
+        logger = setup_logger(output=final_log_file, distributed_rank=dist.get_rank(), name="HRNet-CLS")
+    else:
+        head = '%(asctime)-15s %(message)s'
+        logging.basicConfig(filename=str(final_log_file),
+                            format=head)
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+        console = logging.StreamHandler()
+        logging.getLogger('').addHandler(console)
 
     tensorboard_log_dir = Path(cfg.LOG_DIR) / dataset / model / \
             (cfg_name + '_' + time_str)

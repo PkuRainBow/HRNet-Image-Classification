@@ -14,7 +14,6 @@ import os
 
 from yacs.config import CfgNode as CN
 
-
 _C = CN()
 
 _C.OUTPUT_DIR = ''
@@ -78,6 +77,7 @@ _C.TRAIN.LR_FACTOR = 0.1
 _C.TRAIN.LR_STEP = [90, 110]
 _C.TRAIN.LR = 0.001
 
+_C.TRAIN.SCHEDULER = 'step'
 _C.TRAIN.OPTIMIZER = 'adam'
 _C.TRAIN.MOMENTUM = 0.9
 _C.TRAIN.WD = 0.0001
@@ -93,6 +93,9 @@ _C.TRAIN.CHECKPOINT = ''
 
 _C.TRAIN.BATCH_SIZE_PER_GPU = 32
 _C.TRAIN.SHUFFLE = True
+_C.TRAIN.CUTMIX = False
+_C.TRAIN.CUTMIX_BETA = 1.0
+_C.TRAIN.CUTMIX_PROB = 1.0
 
 # testing
 _C.TEST = CN()
@@ -141,8 +144,8 @@ def update_config(cfg, args):
     if args.testModel:
         cfg.TEST.MODEL_FILE = args.testModel
 
-    cfg.DATASET.ROOT = os.path.join(
-        cfg.DATA_DIR, cfg.DATASET.DATASET, 'images')
+    # cfg.DATASET.ROOT = os.path.join(
+    #     cfg.DATA_DIR, cfg.DATASET.DATASET)
 
     cfg.freeze()
 
