@@ -39,7 +39,6 @@ from utils.utils import create_logger
 from datasets.TSV import TSVInstance
 
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Train classification network')
     
@@ -75,6 +74,7 @@ def main():
 
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
+
 
     logger.info(pprint.pformat(args))
     logger.info(pprint.pformat(config))
@@ -128,7 +128,7 @@ def main():
             logger.info("=> loaded checkpoint (epoch {})"
                         .format(checkpoint['epoch']))
             best_model = True
-            
+
     if config.TRAIN.SCHEDULER == 'cosine':
         lr_scheduler = WarmupCosineLR(
             optimizer,

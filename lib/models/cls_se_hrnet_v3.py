@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class SEModule(nn.Module):
 
-    def __init__(self, channels, reduction):
+    def __init__(self, channels, reduction=1):
         super(SEModule, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc1 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
@@ -55,14 +55,14 @@ def conv3x3(in_planes, out_planes, stride=1):
 class SEBasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, reduction, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, reduction=1, stride=1, downsample=None):
         super(SEBasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
-        self.se_module = SEModule(planes, reduction=reduction)
+        self.se_module = SEModule(planes, reduction)
         self.downsample = downsample
         self.stride = stride
 
@@ -88,7 +88,7 @@ class SEBasicBlock(nn.Module):
 class SEBottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, reduction, stride=1, downsample=None):
+    def __init__(self, inplanes, planes, reduction=1, stride=1, downsample=None):
         super(SEBottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
@@ -100,7 +100,7 @@ class SEBottleneck(nn.Module):
         self.bn3 = nn.BatchNorm2d(planes * self.expansion,
                                momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        self.se_module = SEModule(planes * self.expansion, reduction=reduction)
+        self.se_module = SEModule(planes * self.expansion, reduction)
         self.downsample = downsample
         self.stride = stride
 
@@ -129,7 +129,7 @@ class SEBottleneck(nn.Module):
 
 class SEHighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
-                 num_channels, reduction, fuse_method, multi_scale_output=True):
+                 num_channels, reductions, fuse_method, multi_scale_output=True):
         super(SEHighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels)
@@ -141,7 +141,7 @@ class SEHighResolutionModule(nn.Module):
         self.multi_scale_output = multi_scale_output
 
         self.branches = self._make_branches(
-            num_branches, blocks, num_blocks, num_channels, reduction)
+            num_branches, blocks, num_blocks, num_channels, reductions)
         self.fuse_layers = self._make_fuse_layers()
         self.relu = nn.ReLU(False)
 
@@ -166,7 +166,7 @@ class SEHighResolutionModule(nn.Module):
             raise ValueError(error_msg)
 
     def _make_one_branch(self, branch_index, block, num_blocks, num_channels,
-                         reduction, stride=1):
+                         reductions, stride=1):
         downsample = None
         if stride != 1 or \
            self.num_inchannels[branch_index] != num_channels[branch_index] * block.expansion:
@@ -180,22 +180,22 @@ class SEHighResolutionModule(nn.Module):
 
         layers = []
         layers.append(block(self.num_inchannels[branch_index],
-                            num_channels[branch_index], reduction, stride, downsample))
+                            num_channels[branch_index], reductions[branch_index], stride, downsample))
         self.num_inchannels[branch_index] = \
             num_channels[branch_index] * block.expansion
         for i in range(1, num_blocks[branch_index]):
             layers.append(block(self.num_inchannels[branch_index],
                                 num_channels[branch_index],
-                                reduction))
+                                reductions[branch_index]))
 
         return nn.Sequential(*layers)
 
-    def _make_branches(self, num_branches, block, num_blocks, num_channels, reduction):
+    def _make_branches(self, num_branches, block, num_blocks, num_channels, reductions):
         branches = []
 
         for i in range(num_branches):
             branches.append(
-                self._make_one_branch(i, block, num_blocks, num_channels, reduction))
+                self._make_one_branch(i, block, num_blocks, num_channels, reductions))
 
         return nn.ModuleList(branches)
 
@@ -289,43 +289,46 @@ class SEHighResolutionNet(nn.Module):
         self.bn2 = nn.BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
 
-        self.stage1_cfg = cfg['MODEL']['EXTRA']['STAGE1']
-        reduction = cfg['MODEL']['EXTRA']['REDUCTION']
+        self.stage1_cfg = cfg['MODEL']['EXTRA']['STAGE1']    
         num_channels = self.stage1_cfg['NUM_CHANNELS'][0]
+        reductions = self.stage1_cfg['REDUCTION'][0]
         block = blocks_dict[self.stage1_cfg['BLOCK']]
         num_blocks = self.stage1_cfg['NUM_BLOCKS'][0]
-        self.layer1 = self._make_layer(block, 64, num_channels, num_blocks, reduction)
+        self.layer1 = self._make_layer(block, 64, num_channels, num_blocks, reductions)
         stage1_out_channel = block.expansion*num_channels
 
         self.stage2_cfg = cfg['MODEL']['EXTRA']['STAGE2']
         num_channels = self.stage2_cfg['NUM_CHANNELS']
+        reductions = self.stage2_cfg['REDUCTION']
         block = blocks_dict[self.stage2_cfg['BLOCK']]
         num_channels = [
             num_channels[i] * block.expansion for i in range(len(num_channels))]
         self.transition1 = self._make_transition_layer(
             [stage1_out_channel], num_channels)
         self.stage2, pre_stage_channels = self._make_stage(
-            self.stage2_cfg, num_channels, reduction)
+            self.stage2_cfg, num_channels, reductions)
 
         self.stage3_cfg = cfg['MODEL']['EXTRA']['STAGE3']
         num_channels = self.stage3_cfg['NUM_CHANNELS']
+        reductions = self.stage3_cfg['REDUCTION']
         block = blocks_dict[self.stage3_cfg['BLOCK']]
         num_channels = [
             num_channels[i] * block.expansion for i in range(len(num_channels))]
         self.transition2 = self._make_transition_layer(
             pre_stage_channels, num_channels)
         self.stage3, pre_stage_channels = self._make_stage(
-            self.stage3_cfg, num_channels, reduction)
+            self.stage3_cfg, num_channels, reductions)
 
         self.stage4_cfg = cfg['MODEL']['EXTRA']['STAGE4']
         num_channels = self.stage4_cfg['NUM_CHANNELS']
+        reductions = self.stage3_cfg['REDUCTION']
         block = blocks_dict[self.stage4_cfg['BLOCK']]
         num_channels = [
             num_channels[i] * block.expansion for i in range(len(num_channels))]
         self.transition3 = self._make_transition_layer(
             pre_stage_channels, num_channels)
         self.stage4, pre_stage_channels = self._make_stage(
-            self.stage4_cfg, num_channels, reduction, multi_scale_output=True)
+            self.stage4_cfg, num_channels, reductions, multi_scale_output=True)
 
         # Classification Head
         self.incre_modules, self.downsamp_modules, \
@@ -419,7 +422,7 @@ class SEHighResolutionNet(nn.Module):
 
         return nn.ModuleList(transition_layers)
 
-    def _make_layer(self, block, inplanes, planes, blocks, reduction, stride=1):
+    def _make_layer(self, block, inplanes, planes, blocks, reductions, stride=1):
         downsample = None
         if stride != 1 or inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -429,14 +432,14 @@ class SEHighResolutionNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(inplanes, planes, reduction, stride, downsample))
+        layers.append(block(inplanes, planes, reductions, stride, downsample))
         inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(inplanes, planes, reduction))
+            layers.append(block(inplanes, planes, reductions))
 
         return nn.Sequential(*layers)
 
-    def _make_stage(self, layer_config, num_inchannels, reduction,
+    def _make_stage(self, layer_config, num_inchannels, reductions,
                     multi_scale_output=True):
         num_modules = layer_config['NUM_MODULES']
         num_branches = layer_config['NUM_BRANCHES']
@@ -459,7 +462,7 @@ class SEHighResolutionNet(nn.Module):
                                        num_blocks,
                                        num_inchannels,
                                        num_channels,
-                                       reduction,
+                                       reductions,
                                        fuse_method,
                                        reset_multi_scale_output)
             )

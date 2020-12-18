@@ -39,7 +39,7 @@ def create_logger(cfg, cfg_name, phase='train'):
     log_file = '{}_{}_{}.log'.format(cfg_name, time_str, phase)
     final_log_file = str(final_output_dir / log_file)
 
-    if int(os.environ.get("distribute_training", 1)):
+    if cfg.TRAIN.DISTRIBUTE:
         logger = setup_logger(output=final_log_file, distributed_rank=dist.get_rank(), name="HRNet-CLS")
     else:
         head = '%(asctime)-15s %(message)s'

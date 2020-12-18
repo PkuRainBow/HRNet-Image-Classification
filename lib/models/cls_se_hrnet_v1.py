@@ -24,22 +24,45 @@ BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
 
 
+class SEModule(nn.Module):
+
+    def __init__(self, channels, reduction=1):
+        super(SEModule, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc1 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
+                             padding=0)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Conv2d(channels // reduction, channels, kernel_size=1,
+                             padding=0)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        module_input = x
+        x = self.avg_pool(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return module_input * x
+
+
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
 
-class BasicBlock(nn.Module):
+class SEBasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(BasicBlock, self).__init__()
+        super(SEBasicBlock, self).__init__()
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
+        self.se_module = SEModule(planes)
         self.downsample = downsample
         self.stride = stride
 
@@ -56,17 +79,17 @@ class BasicBlock(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
 
-        out += residual
+        out = self.se_module(out) + residual
         out = self.relu(out)
 
         return out
 
 
-class Bottleneck(nn.Module):
+class SEBottleneck(nn.Module):
     expansion = 4
 
     def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(Bottleneck, self).__init__()
+        super(SEBottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes, momentum=BN_MOMENTUM)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
@@ -77,6 +100,7 @@ class Bottleneck(nn.Module):
         self.bn3 = nn.BatchNorm2d(planes * self.expansion,
                                momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
+        self.se_module = SEModule(planes * self.expansion)
         self.downsample = downsample
         self.stride = stride
 
@@ -97,16 +121,16 @@ class Bottleneck(nn.Module):
         if self.downsample is not None:
             residual = self.downsample(x)
 
-        out += residual
+        out = self.se_module(out) + residual
         out = self.relu(out)
 
         return out
 
 
-class HighResolutionModule(nn.Module):
+class SEHighResolutionModule(nn.Module):
     def __init__(self, num_branches, blocks, num_blocks, num_inchannels,
                  num_channels, fuse_method, multi_scale_output=True):
-        super(HighResolutionModule, self).__init__()
+        super(SEHighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels)
 
@@ -246,15 +270,15 @@ class HighResolutionModule(nn.Module):
 
 
 blocks_dict = {
-    'BASIC': BasicBlock,
-    'BOTTLENECK': Bottleneck
+    'SEBASIC': SEBasicBlock,
+    'SEBOTTLENECK': SEBottleneck
 }
 
 
-class HighResolutionNet(nn.Module):
+class SEHighResolutionNet(nn.Module):
 
     def __init__(self, cfg, **kwargs):
-        super(HighResolutionNet, self).__init__()
+        super(SEHighResolutionNet, self).__init__()
 
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
                                bias=False)
@@ -308,7 +332,7 @@ class HighResolutionNet(nn.Module):
         self.classifier = nn.Linear(2048, 1000)
 
     def _make_head(self, pre_stage_channels):
-        head_block = Bottleneck
+        head_block = SEBottleneck
         head_channels = [32, 64, 128, 256]
 
         # Increasing the #channels on each resolution 
@@ -427,13 +451,13 @@ class HighResolutionNet(nn.Module):
                 reset_multi_scale_output = True
 
             modules.append(
-                HighResolutionModule(num_branches,
-                                      block,
-                                      num_blocks,
-                                      num_inchannels,
-                                      num_channels,
-                                      fuse_method,
-                                      reset_multi_scale_output)
+                SEHighResolutionModule(num_branches,
+                                       block,
+                                       num_blocks,
+                                       num_inchannels,
+                                       num_channels,
+                                       fuse_method,
+                                       reset_multi_scale_output)
             )
             num_inchannels = modules[-1].get_num_inchannels()
 
@@ -480,18 +504,17 @@ class HighResolutionNet(nn.Module):
 
         y = self.final_layer(y)
 
-        # if torch._C._get_tracing_state():
-        #     y = y.flatten(start_dim=2).mean(dim=2)
-        # else:
-        #     y = F.avg_pool2d(y, kernel_size=y.size()
-        #                          [2:]).view(y.size(0), -1)
+        if torch._C._get_tracing_state():
+            y = y.flatten(start_dim=2).mean(dim=2)
+        else:
+            y = F.avg_pool2d(y, kernel_size=y.size()
+                                 [2:]).view(y.size(0), -1)
 
-        y = F.avg_pool2d(y, kernel_size=y.size()
-                            [2:]).view(y.size(0), -1)
         y = self.classifier(y)
 
         return y
 
+    #TODO
     def init_weights(self, pretrained='',):
         logger.info('=> init weights from normal distribution')
         for m in self.modules():
@@ -515,6 +538,6 @@ class HighResolutionNet(nn.Module):
 
 
 def get_cls_net(config, **kwargs):
-    model = HighResolutionNet(config, **kwargs)
+    model = SEHighResolutionNet(config, **kwargs)
     model.init_weights()
     return model

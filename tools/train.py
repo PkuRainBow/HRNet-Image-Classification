@@ -32,14 +32,12 @@ from config import config
 from config import update_config
 from core.function import train
 from core.function import validate
-# from core.scheduler.cosine_lr import CosineLRScheduler
 from core.lr_scheduler import WarmupCosineLR, WarmupMultiStepLR
 from utils.modelsummary import get_model_summary
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
 from utils.utils import create_logger
 from datasets.TSV import TSVInstance
-
 
 
 def parse_args():
@@ -126,13 +124,6 @@ def main():
     )
     logger.info(get_model_summary(model, dump_input))
 
-    # copy model file
-    # this_dir = os.path.dirname(__file__)
-    # models_dst_dir = os.path.join(final_output_dir, 'models')
-    # if os.path.exists(models_dst_dir):
-    #     shutil.rmtree(models_dst_dir)
-    # shutil.copytree(os.path.join(this_dir, '../lib/models'), models_dst_dir)
-
     writer_dict = {
         'writer': SummaryWriter(log_dir=tb_log_dir),
         'train_global_steps': 0,
@@ -140,10 +131,6 @@ def main():
     }
 
     gpus = list(config.GPUS)
-
-    '''
-    model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
-    '''
     # Change DP to DDP
     torch.cuda.set_device(args.local_rank)
     model = model.to(args.local_rank)
@@ -169,7 +156,7 @@ def main():
             logger.info("=> loaded checkpoint (epoch {})"
                         .format(checkpoint['epoch']))
             best_model = True
-        
+
     if config.TRAIN.SCHEDULER == 'cosine':
         lr_scheduler = WarmupCosineLR(
             optimizer,
@@ -253,6 +240,10 @@ def main():
     )
 
     for epoch in range(last_epoch, config.TRAIN.END_EPOCH):
+        # shuffle the data sampler at each epoch
+        if config.TRAIN.DISTRIBUTE:
+            train_sampler.set_epoch(epoch)
+
         lr_scheduler.step()
         # train for one epoch
         train(config, train_loader, model, criterion, optimizer, epoch,

@@ -88,5 +88,7 @@ TRAIN:
   NESTEROV: true
   SHUFFLE: true
   CUTMIX: false
+  AUTO_MIX_PRECISION: true
+  DISTRIBUTE: true
 DEBUG:
   DEBUG: false

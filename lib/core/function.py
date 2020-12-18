@@ -50,9 +50,8 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
 
     # switch to train mode
     model.train()
-    scaler = torch.cuda.amp.GradScaler()
 
-    if int(os.environ.get("auto_mix_precision", 1)):
+    if config.TRAIN.AUTO_MIX_PRECISION:
         scaler = torch.cuda.amp.GradScaler()
 
     end = time.time()
@@ -64,7 +63,7 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
         #target = target - 1 # Specific for imagenet
 
         # compute output
-        if int(os.environ.get("auto_mix_precision", 1)):
+        if config.TRAIN.AUTO_MIX_PRECISION:
             with torch.cuda.amp.autocast():
                 r = np.random.rand(1)
                 if config.TRAIN.CUTMIX and config.TRAIN.CUTMIX_BETA > 0 and r < config.TRAIN.CUTMIX_PROB:

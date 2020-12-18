@@ -2,20 +2,21 @@ GPUS: (0,1,2,3)
 LOG_DIR: 'log/'
 DATA_DIR: ''
 OUTPUT_DIR: 'output/'
-WORKERS: 16
+WORKERS: 4
 PRINT_FREQ: 100
 
 MODEL: 
-  NAME: cls_se_hrnet
+  NAME: cls_hrnet
   IMAGE_SIZE: 
     - 224
     - 224
   EXTRA:
-    REDUCTION: 1
+    # SE_REDUCTION: 1
+    # WITH_SE: true
     STAGE1:
       NUM_MODULES: 1
       NUM_RANCHES: 1
-      BLOCK: SEBOTTLENECK
+      BLOCK: BOTTLENECK
       NUM_BLOCKS:
       - 4
       NUM_CHANNELS:
@@ -24,7 +25,7 @@ MODEL:
     STAGE2:
       NUM_MODULES: 1
       NUM_BRANCHES: 2
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -35,7 +36,7 @@ MODEL:
     STAGE3:
       NUM_MODULES: 4
       NUM_BRANCHES: 3
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -48,7 +49,7 @@ MODEL:
     STAGE4:
       NUM_MODULES: 3
       NUM_BRANCHES: 4
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -70,12 +71,12 @@ DATASET:
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
-  BATCH_SIZE_PER_GPU: 128
+  BATCH_SIZE_PER_GPU: 32
   MODEL_FILE: ''
 TRAIN:
-  BATCH_SIZE_PER_GPU: 128
+  BATCH_SIZE_PER_GPU: 32
   BEGIN_EPOCH: 0
-  END_EPOCH: 100
+  END_EPOCH: 300
   RESUME: true
   LR_FACTOR: 0.1
   LR_STEP:
@@ -84,10 +85,13 @@ TRAIN:
   - 90
   OPTIMIZER: sgd
   SCHEDULER: cosine
-  LR: 0.1
+  LR: 0.4
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
+  CUTMIX: true
+  AUTO_MIX_PRECISION: false
+  DISTRIBUTE: true
 DEBUG:
   DEBUG: false
