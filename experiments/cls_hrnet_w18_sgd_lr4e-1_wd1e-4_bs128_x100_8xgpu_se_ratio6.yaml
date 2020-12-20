@@ -7,11 +7,11 @@ PRINT_FREQ: 100
 
 MODEL: 
   NAME: cls_se_hrnet
-  IMAGE_SIZE: 
+  IMAGE_SIZE:
     - 224
     - 224
   EXTRA:
-    SE_REDUCTION: 1
+    SE_REDUCTION: 6
     WITH_SE: true
     STAGE1:
       NUM_MODULES: 1
@@ -76,7 +76,7 @@ TEST:
 TRAIN:
   BATCH_SIZE_PER_GPU: 128
   BEGIN_EPOCH: 0
-  END_EPOCH: 300
+  END_EPOCH: 100
   RESUME: true
   LR_FACTOR: 0.1
   LR_STEP:
@@ -84,13 +84,12 @@ TRAIN:
   - 60
   - 90
   OPTIMIZER: sgd
-  SCHEDULER: cosine
   LR: 0.4
   WD: 0.0001
   MOMENTUM: 0.9
   NESTEROV: true
   SHUFFLE: true
-  CUTMIX: true
+  CUTMIX: false
   AUTO_MIX_PRECISION: true
   DISTRIBUTE: true
 DEBUG:

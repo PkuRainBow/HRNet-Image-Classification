@@ -15,7 +15,7 @@ CONFIG="$2.yaml"
 # test_cls_se_hrnet_w18_sgd_lr1e-1_wd1e-4_bs64_x100_dist
 $PYTHON -m torch.distributed.launch \
     --nproc_per_node=$NUM_GPUS \
-    --use_env tools/train.py \
+    tools/train.py \
     --cfg experiments/$CONFIG
 
 # cls_hrnet_w18_sgd_lr5e-2_wd1e-4_bs32_x100

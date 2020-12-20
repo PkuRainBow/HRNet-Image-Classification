@@ -208,7 +208,7 @@ class HighResolutionModule(nn.Module):
 
         for i in range(num_branches):
             branches.append(
-                self._make_one_branch(i, block, num_blocks, num_channels, reduction, with_se))
+                self._make_one_branch(i, block, num_blocks, num_channels, reduction=reduction, with_se=with_se))
 
         return nn.ModuleList(branches)
 

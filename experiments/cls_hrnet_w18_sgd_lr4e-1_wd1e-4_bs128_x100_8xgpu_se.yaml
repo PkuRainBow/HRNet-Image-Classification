@@ -7,15 +7,16 @@ PRINT_FREQ: 100
 
 MODEL: 
   NAME: cls_se_hrnet
-  IMAGE_SIZE: 
+  IMAGE_SIZE:
     - 224
     - 224
   EXTRA:
-    REDUCTION: 1
+    SE_REDUCTION: 2
+    WITH_SE: true
     STAGE1:
       NUM_MODULES: 1
       NUM_RANCHES: 1
-      BLOCK: SEBOTTLENECK
+      BLOCK: BOTTLENECK
       NUM_BLOCKS:
       - 4
       NUM_CHANNELS:
@@ -24,7 +25,7 @@ MODEL:
     STAGE2:
       NUM_MODULES: 1
       NUM_BRANCHES: 2
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -35,7 +36,7 @@ MODEL:
     STAGE3:
       NUM_MODULES: 4
       NUM_BRANCHES: 3
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
@@ -48,7 +49,7 @@ MODEL:
     STAGE4:
       NUM_MODULES: 3
       NUM_BRANCHES: 4
-      BLOCK: SEBASIC
+      BLOCK: BASIC
       NUM_BLOCKS:
       - 4
       - 4
