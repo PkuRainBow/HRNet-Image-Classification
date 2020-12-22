@@ -11,7 +11,7 @@ MODEL:
     - 224
     - 224
   EXTRA:
-    SE_REDUCTION: 1
+    SE_REDUCTION: 6
     WITH_SE: true
     STAGE1:
       NUM_MODULES: 1
