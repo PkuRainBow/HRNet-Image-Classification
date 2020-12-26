@@ -67,14 +67,14 @@ CUDNN:
   ENABLED: true
 DATASET:
   DATASET: 'imagenet'
-  ROOT: '/mnt/imagenet100_zhirong'
+  ROOT: '/dev/shm/imagenet_zhirong/'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
-  BATCH_SIZE_PER_GPU: 64
+  BATCH_SIZE_PER_GPU: 128
   MODEL_FILE: ''
 TRAIN:
-  BATCH_SIZE_PER_GPU: 64
+  BATCH_SIZE_PER_GPU: 128
   BEGIN_EPOCH: 0
   END_EPOCH: 300
   RESUME: true

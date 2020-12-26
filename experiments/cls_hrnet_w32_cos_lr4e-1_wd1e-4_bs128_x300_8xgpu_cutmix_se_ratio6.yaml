@@ -30,8 +30,8 @@ MODEL:
       - 4
       - 4
       NUM_CHANNELS:
-      - 48
-      - 96
+      - 32
+      - 64
       FUSE_METHOD: SUM
     STAGE3:
       NUM_MODULES: 4
@@ -42,9 +42,9 @@ MODEL:
       - 4
       - 4
       NUM_CHANNELS:
-      - 48
-      - 96
-      - 192
+      - 32
+      - 64
+      - 128
       FUSE_METHOD: SUM
     STAGE4:
       NUM_MODULES: 3
@@ -56,10 +56,10 @@ MODEL:
       - 4
       - 4
       NUM_CHANNELS:
-      - 48
-      - 96
-      - 192
-      - 384
+      - 32
+      - 64
+      - 128
+      - 256
       FUSE_METHOD: SUM
 CUDNN:
   BENCHMARK: true
@@ -67,14 +67,14 @@ CUDNN:
   ENABLED: true
 DATASET:
   DATASET: 'imagenet'
-  ROOT: '/mnt/imagenet100_zhirong'
+  ROOT: '/dev/shm/imagenet_zhirong/'
   TEST_SET: 'val'
   TRAIN_SET: 'train'
 TEST:
-  BATCH_SIZE_PER_GPU: 64
+  BATCH_SIZE_PER_GPU: 128
   MODEL_FILE: ''
 TRAIN:
-  BATCH_SIZE_PER_GPU: 64
+  BATCH_SIZE_PER_GPU: 128
   BEGIN_EPOCH: 0
   END_EPOCH: 300
   RESUME: true
